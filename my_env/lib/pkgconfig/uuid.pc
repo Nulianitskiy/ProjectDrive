@@ -1,0 +1,11 @@
+prefix=/home/captain/anaconda3/envs/my_env
+exec_prefix=/home/captain/anaconda3/envs/my_env
+libdir=/home/captain/anaconda3/envs/my_env/lib
+includedir=/home/captain/anaconda3/envs/my_env/include
+
+Name: uuid
+Description: Universally unique id library
+Version: 2.32.1
+Requires:
+Cflags: -I${includedir}/uuid
+Libs: -L${libdir} -luuid
