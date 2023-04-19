@@ -1,8 +1,8 @@
 import pygame
 import math
 import osmnx as ox
+import random as ra
 from abc import ABCMeta
-from random import randint, random
 
 import ograph
 import Astar
@@ -18,16 +18,18 @@ def near(p, center, radius):
     d2 = (p[0] - center[0])**2 + (p[1] - center[1])**2
     return d2 <= radius**2
 
-def set_agent(agent, graph):
-    ed = graph.find_node(agent.way[0], agent.way[1])
-    ed.add_agent(agent)
-    agent.cur_edge = ed
+def set_agent(agent, graph, time):
+    if(agent.move_time == time):
+        ed = graph.find_node(agent.way[0], agent.way[1])
+        ed.add_agent(agent)
+        agent.cur_edge = ed
+        agent.in_move = True
     #print(ed.weight, ed.capacity)
 
 def move_agent(agent, graph):
     if agent.in_move:
         if len(agent.way) > agent.cur_pos+1:
-            if agent.move_time >= agent.cur_edge.weight:
+            if agent.move_time >= agent.cur_edge.weight and not graph.verticies[agent.way[agent.cur_pos + 1]].light_stop:
                 nnode = graph.find_node(agent.way[agent.cur_pos],agent.way[agent.cur_pos + 1])
                 if nnode.check_road:
                     agent.cur_edge.del_agent()
@@ -62,7 +64,12 @@ class Vertex (GraphObject):
         self.__edges = []
         self.selected = False
         self.selection_color = (255, 0, 0)
- 
+
+        self.light = False
+        self.light_stop = False
+        self.light_time = 0
+        self.light_cur_time = 0
+
     @property
     def edges(self):
         return self.__edges
@@ -101,6 +108,14 @@ class Vertex (GraphObject):
         #    surface.blit(self.__name_surface, (self.x-w//2, self.y-h//2))
         if self.selected:  # Нарисовать выбранную вершину
             pygame.draw.circle(surface, self.selection_color, self.pos, self.size-self.width)
+
+    def update_traffic_light(self):
+        if self.light_cur_time >= self.light_time:
+            self.light_cur_time = 0
+            self.light_stop = not self.light_stop
+
+        self.color = (0, 255, 0) if not self.light_stop else (255, 0, 0)
+        self.light_cur_time += 1
  
  
 class Edge (GraphObject):
@@ -166,10 +181,11 @@ class Edge (GraphObject):
  
  
 class Graph:
-    def __init__(self, matrix, verticies, edges):
+    def __init__(self, matrix, verticies, edges, tr_lights):
         self.matrix = matrix
         self.verticies = verticies
         self.edges = edges
+        self.tr_light = tr_lights
         self.objects = self.edges + self.verticies
 
         #for ed in edges:
@@ -197,19 +213,27 @@ class Graph:
         matrix = [[0]*n for _ in range(n)]
         verticies = []
         edges = []
+        tr_lights = []
 
         for i in range(n):
             # Нормализация/центрирование
             x = (graph.node_list[i][0] - graph.minx)/(graph.maxx - graph.minx) * (SIZE[0]-100) + 50
-            y = (graph.node_list[i][1] - graph.miny)/(graph.maxy - graph.miny) * (SIZE[1]-100) + 50
+            y = SIZE[1] - ((graph.node_list[i][1] - graph.miny)/(graph.maxy - graph.miny) * (SIZE[1]-100) + 50)
             verticies.append(Vertex(str(i),x,y, vsize, color, width))
+
+        for j in range(n-1):
+            if graph.get_node_deg(j) >= 3 and ra.random() <= 0.3:
+                verticies[j].light = True
+                verticies[j].light_time = 30
+                verticies[j].light_cur_time = ra.randrange(61)
+                tr_lights.append(verticies[j])
         
         for x, value in graph.edge_list.items():
             for y, l in value.items():
                 matrix[x][y] = matrix[y][x]= l
                 edges.append(Edge(verticies[x],verticies[y],l,color,5))
         
-        return cls(matrix,verticies, edges)
+        return cls(matrix,verticies, edges, tr_lights)
     
     def find_node(self, a, b):
         for ed in self.edges:
@@ -218,7 +242,7 @@ class Graph:
 
  
 FPS = 30
-SIZE = (800, 600)
+SIZE = (1200, 900)
 
 pygame.init()
 screen = pygame.display.set_mode(SIZE, pygame.DOUBLEBUF | pygame.HWSURFACE | pygame.RESIZABLE)
@@ -229,9 +253,9 @@ font = pygame.font.SysFont(None, 100)
  
 #g = Graph.random(300, 300, 8)
 # Галерея
-#graph = ograph.OGraph(ox.graph_from_point((45.039546, 38.974388), dist=500, network_type="drive", retain_all=False))
+graph = ograph.OGraph(ox.graph_from_point((45.039546, 38.974388), dist=3000, network_type="drive", retain_all=False))
 # Кубик
-graph = ograph.OGraph(ox.graph_from_point((45.019667, 39.027768), dist=1000, network_type="drive", retain_all=False))
+#graph = ograph.OGraph(ox.graph_from_point((45.019667, 39.027768), dist=1000, network_type="drive", retain_all=False))
 
 
 g = Graph.from_ograph(graph)
@@ -244,7 +268,6 @@ agents = []
 
 for i in range(agents_n):
     agents.append(Agent.Agent(graph,0))
-    set_agent(agents[i], g)
  
 h = m = s = 0
 text = font.render(str(s), True, (0, 128, 0))
@@ -261,7 +284,11 @@ while running:
             running = False
         elif ev.type == timer_event:
             for i in range(agents_n):
+                set_agent(agents[i], g, h*3600+m*60+s)
                 move_agent(agents[i],g)
+            for j in g.tr_light:
+                j.update_traffic_light()
+
             s += 1
             if s >= 60: s -= 60; m += 1
             if m >= 60: m -= 60; h += 1

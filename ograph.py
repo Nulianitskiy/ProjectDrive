@@ -53,3 +53,6 @@ class OGraph:
             p+=1
 
         return nodes, edges
+
+    def get_node_deg(self, node):
+        return len(self.edge_list[node])

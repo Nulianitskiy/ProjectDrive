@@ -22,7 +22,7 @@ class Agent:
         self.start_time = start_time
         self.g = graph
         self.way = []
-        self.in_move = True
+        self.in_move = False
         self.generate()
     
     def find_way(self):
@@ -35,5 +35,6 @@ class Agent:
             self.start = ra.randrange(n)
             self.goal = ra.randrange(n)
             self.way = self.find_way()
+            self.move_time = ra.randrange(3600)
             if self.way != None and self.start != self.goal:
                 break
