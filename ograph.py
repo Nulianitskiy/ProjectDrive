@@ -13,7 +13,6 @@ class OGraph:
         self.miny = min(x[1] for x in self.node_list)
         self.maxx = max(x[0] for x in self.node_list)
         self.maxy = max(x[1] for x in self.node_list)
-    
 
     def transform_graph(self, G_nx):
         osmids = list(G_nx.nodes)
@@ -24,10 +23,10 @@ class OGraph:
 
         # переводим networkx граф в igraph
         G_ig = ig.Graph(directed=True)
-        G_ig.add_vertices(G_nx.nodes) # Передается y, x, highway, street_count, osmid
+        G_ig.add_vertices(G_nx.nodes)  # Передается y, x, highway, street_count, osmid
         G_ig.add_edges(G_nx.edges())
-        #G_ig.vs["osmid"] = osmids
-        we = list(nx.get_edge_attributes(G_nx, "length").values()) # length
+        # G_ig.vs["osmid"] = osmids
+        we = list(nx.get_edge_attributes(G_nx, "length").values())  # length
 
         for i in range(len(we)):
             we[i] = round(we[i])
@@ -35,24 +34,22 @@ class OGraph:
 
         nodes = []
         for i in range(len(G_ig.vs)):
-            nodes.append([G_ig.vs["name"][i]["x"],G_ig.vs["name"][i]["y"],osmids[i]])
+            nodes.append([G_ig.vs["name"][i]["x"], G_ig.vs["name"][i]["y"], osmids[i]])
 
         edges = {}
-        inner_dict = {}
-        n = 0
         p = 0
+
         for i in G_nx.edges():
-            if(i[0]==n):
-                inner_dict[i[1]] = G_ig.es["length"][p]
+            if i[0] not in edges:
+                edges[i[0]] = {i[1] : G_ig.es["length"][p]}
             else:
-                a = inner_dict.copy()
-                edges[n] = a
-                inner_dict.clear()
-                inner_dict[i[1]] = G_ig.es["length"][p]
-                n+=1
+                edges[i[0]][i[1]] = G_ig.es["length"][p]
+            
             p+=1
 
         return nodes, edges
 
     def get_node_deg(self, node):
-        return len(self.edge_list[node])
+        if node in self.edge_list:
+            return len(self.edge_list[node])
+        return 0
